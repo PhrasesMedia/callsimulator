@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Call Simulator</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;400;600;700&family=Barlow+Condensed:wght@700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c0f;
+    --panel: #0f1215;
+    --border: #1e2530;
+    --amber: #f5a623;
+    --amber-dim: #7a5210;
+    --green: #39d353;
+    --green-dim: #1a4a25;
+    --red: #ff4444;
+    --red-dim: #4a1515;
+    --blue: #4da6ff;
+    --text: #c8d4e0;
+    --text-dim: #4a5568;
+    --text-bright: #eef4fb;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'Barlow', sans-serif;
+    --cond: 'Barlow Condensed', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── TOP BAR ── */
+  #topbar {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+
+  #topbar .logo {
+    font-family: var(--cond);
+    font-size: 18px;
+    font-weight: 900;
+    letter-spacing: 4px;
+    color: var(--amber);
+    text-transform: uppercase;
+  }
+
+  #topbar .logo span { color: var(--text-dim); font-weight: 300; }
+
+  .status-row {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+
+  .pill {
+    padding: 3px 10px;
+    border-radius: 2px;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .pill.standby { background: var(--amber-dim); color: var(--amber); }
+  .pill.live { background: var(--red-dim); color: var(--red); animation: blink 1s step-end infinite; }
+  .pill.done { background: var(--green-dim); color: var(--green); }
+
+  @keyframes blink { 50% { opacity: 0.4; } }
+
+  #call-timer {
+    font-family: var(--mono);
+    font-size: 22px;
+    color: var(--red);
+    letter-spacing: 3px;
+    min-width: 80px;
+    text-align: right;
+    display: none;
+  }
+
+  #call-timer.running { display: block; }
+
+  /* ── MAIN LAYOUT ── */
+  #main {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ── LEFT: CALL AREA ── */
+  #call-area {
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    overflow: hidden;
+    border-right: 1px solid var(--border);
+  }
+
+  /* IDLE SCREEN */
+  #idle-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    gap: 32px;
+    padding: 40px;
+  }
+
+  .phone-icon {
+    width: 80px;
+    height: 80px;
+    border: 2px solid var(--border);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    color: var(--text-dim);
+    background: var(--panel);
+  }
+
+  #idle-screen h2 {
+    font-family: var(--cond);
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--text);
+    text-align: center;
+  }
+
+  #idle-screen p {
+    color: var(--text-dim);
+    font-size: 14px;
+    text-align: center;
+    max-width: 380px;
+    line-height: 1.6;
+  }
+
+  .btn-start {
+    background: var(--amber);
+    color: #000;
+    border: none;
+    padding: 14px 40px;
+    font-family: var(--cond);
+    font-size: 16px;
+    font-weight: 900;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.15s;
+  }
+
+  .btn-start:hover {
+    background: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 20px rgba(245,166,35,0.3);
+  }
+
+  /* INCOMING SCREEN */
+  #incoming-screen {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    gap: 24px;
+    padding: 40px;
+    animation: pulseIn 0.3s ease;
+  }
+
+  @keyframes pulseIn {
+    from { opacity: 0; transform: scale(0.96); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  .ring-anim {
+    position: relative;
+    width: 90px;
+    height: 90px;
+  }
+
+  .ring-anim::before, .ring-anim::after {
+    content: '';
+    position: absolute;
+    border-radius: 50%;
+    border: 2px solid var(--amber);
+    animation: ring 1.2s ease-out infinite;
+  }
+
+  .ring-anim::before { inset: -10px; animation-delay: 0s; }
+  .ring-anim::after { inset: -22px; animation-delay: 0.3s; }
+
+  .ring-icon {
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    background: var(--amber-dim);
+    border: 2px solid var(--amber);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 34px;
+  }
+
+  @keyframes ring {
+    from { transform: scale(1); opacity: 0.8; }
+    to { transform: scale(1.5); opacity: 0; }
+  }
+
+  #incoming-screen h3 {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--amber);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+
+  #caller-id {
+    font-family: var(--cond);
+    font-size: 32px;
+    font-weight: 900;
+    color: var(--text-bright);
+    letter-spacing: 1px;
+  }
+
+  .btn-answer {
+    background: var(--green);
+    color: #000;
+    border: none;
+    padding: 14px 48px;
+    font-family: var(--cond);
+    font-size: 16px;
+    font-weight: 900;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.15s;
+    margin-top: 10px;
+  }
+
+  .btn-answer:hover {
+    background: #fff;
+    transform: translateY(-1px);
+  }
+
+  /* ACTIVE CALL SCREEN */
+  #active-screen {
+    display: none;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  #call-header {
+    background: var(--red-dim);
+    border-bottom: 1px solid var(--red);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+
+  #call-header .caller-info { display: flex; flex-direction: column; gap: 2px; }
+  #call-header .caller-name { font-family: var(--cond); font-size: 18px; font-weight: 700; color: var(--text-bright); }
+  #call-header .caller-sub { font-family: var(--mono); font-size: 10px; color: var(--red); letter-spacing: 2px; }
+
+  #call-header .timer-display {
+    font-family: var(--mono);
+    font-size: 28px;
+    color: var(--red);
+    letter-spacing: 4px;
+  }
+
+  #scenario-box {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .scenario-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .scenario-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--amber);
+    padding: 18px 20px;
+    border-radius: 2px;
+  }
+
+  .scenario-card h4 {
+    font-family: var(--cond);
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-bright);
+    margin-bottom: 10px;
+    letter-spacing: 0.5px;
+  }
+
+  .scenario-card p {
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--text);
+  }
+
+  .caller-says {
+    background: #0d1520;
+    border: 1px solid #1a2a3a;
+    border-left: 3px solid var(--blue);
+    padding: 16px 20px;
+    border-radius: 2px;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--blue);
+    line-height: 1.8;
+    font-style: italic;
+  }
+
+  .caller-says::before {
+    content: '🎧 CALLER: ';
+    font-style: normal;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--text-dim);
+    display: block;
+    margin-bottom: 8px;
+  }
+
+  /* URL INPUT AREA */
+  #url-area {
+    border-top: 1px solid var(--border);
+    padding: 16px 24px;
+    background: var(--panel);
+    flex-shrink: 0;
+  }
+
+  .url-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--amber);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .url-input-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  #doc-url-input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text-bright);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 10px 14px;
+    border-radius: 2px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  #doc-url-input:focus { border-color: var(--amber); }
+  #doc-url-input.correct { border-color: var(--green); background: var(--green-dim); }
+  #doc-url-input.incorrect { border-color: var(--red); background: var(--red-dim); }
+
+  .btn-submit {
+    background: var(--amber);
+    color: #000;
+    border: none;
+    padding: 10px 20px;
+    font-family: var(--cond);
+    font-size: 13px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: background 0.15s;
+    white-space: nowrap;
+  }
+
+  .btn-submit:hover { background: #fff; }
+
+  #url-feedback {
+    font-family: var(--mono);
+    font-size: 11px;
+    margin-top: 8px;
+    min-height: 16px;
+    letter-spacing: 0.5px;
+  }
+
+  #url-feedback.ok { color: var(--green); }
+  #url-feedback.bad { color: var(--red); }
+
+  /* RESULT SCREEN */
+  #result-screen {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    gap: 20px;
+    padding: 40px;
+  }
+
+  #result-screen .result-icon { font-size: 56px; }
+
+  #result-score {
+    font-family: var(--cond);
+    font-size: 64px;
+    font-weight: 900;
+    letter-spacing: 2px;
+  }
+
+  #result-screen .result-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-top: -12px;
+  }
+
+  .result-detail {
+    font-size: 14px;
+    color: var(--text);
+    text-align: center;
+    max-width: 360px;
+    line-height: 1.7;
+  }
+
+  .result-detail strong { color: var(--text-bright); }
+
+  .btn-next {
+    background: transparent;
+    color: var(--amber);
+    border: 1px solid var(--amber);
+    padding: 12px 36px;
+    font-family: var(--cond);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.15s;
+    margin-top: 8px;
+  }
+
+  .btn-next:hover { background: var(--amber); color: #000; }
+
+  /* ── RIGHT: KNOWLEDGE BASE ── */
+  #kb-panel {
+    background: var(--panel);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  #kb-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  #kb-header h3 {
+    font-family: var(--cond);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  #kb-search {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 7px 10px;
+    border-radius: 2px;
+    outline: none;
+    margin-top: 10px;
+  }
+
+  #kb-search:focus { border-color: var(--amber); }
+
+  #kb-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+  }
+
+  #kb-list::-webkit-scrollbar { width: 4px; }
+  #kb-list::-webkit-scrollbar-track { background: transparent; }
+  #kb-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .kb-category {
+    padding: 8px 18px 4px;
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .kb-item {
+    padding: 9px 18px;
+    cursor: pointer;
+    transition: background 0.1s;
+    border-left: 2px solid transparent;
+  }
+
+  .kb-item:hover {
+    background: rgba(245,166,35,0.06);
+    border-left-color: var(--amber);
+  }
+
+  .kb-item .doc-title {
+    font-size: 12px;
+    color: var(--text);
+    line-height: 1.4;
+    margin-bottom: 3px;
+  }
+
+  .kb-item .doc-url {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    word-break: break-all;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .copy-hint {
+    font-size: 9px;
+    color: var(--amber);
+    opacity: 0;
+    transition: opacity 0.15s;
+    white-space: nowrap;
+    font-family: var(--mono);
+  }
+
+  .kb-item:hover .copy-hint { opacity: 1; }
+
+  .kb-item.highlighted {
+    background: rgba(57,211,83,0.08);
+    border-left-color: var(--green);
+  }
+
+  /* ── SCORE FOOTER ── */
+  #score-bar {
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+    padding: 8px 20px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    flex-shrink: 0;
+  }
+
+  .score-item { display: flex; align-items: center; gap: 8px; }
+  .score-item .val { color: var(--text-bright); font-size: 13px; }
+  .score-item .val.green { color: var(--green); }
+  .score-item .val.red { color: var(--red); }
+
+  /* scrollbar for scenario box */
+  #scenario-box::-webkit-scrollbar { width: 4px; }
+  #scenario-box::-webkit-scrollbar-track { background: transparent; }
+  #scenario-box::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <div class="logo">Call<span>Sim</span></div>
+  <div class="status-row">
+    <span id="status-pill" class="pill standby">STANDBY</span>
+    <span id="call-timer">00:00</span>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+
+  <!-- LEFT: CALL AREA -->
+  <div id="call-area">
+
+    <!-- IDLE -->
+    <div id="idle-screen">
+      <div class="phone-icon">📞</div>
+      <h2>Call Simulator</h2>
+      <p>A random scenario will be assigned. Locate the correct process document from the Knowledge Base, copy its URL, and paste it below before the clock runs out.</p>
+      <button class="btn-start" onclick="startIncoming()">BEGIN SESSION</button>
+    </div>
+
+    <!-- INCOMING -->
+    <div id="incoming-screen">
+      <div class="ring-anim">
+        <div class="ring-icon">📞</div>
+      </div>
+      <h3>Incoming Call</h3>
+      <div id="caller-id">—</div>
+      <button class="btn-answer" onclick="answerCall()">ANSWER</button>
+    </div>
+
+    <!-- ACTIVE CALL -->
+    <div id="active-screen">
+      <div id="call-header">
+        <div class="caller-info">
+          <div class="caller-name" id="active-caller-name">—</div>
+          <div class="caller-sub">● ON CALL</div>
+        </div>
+        <div class="timer-display" id="header-timer">00:00</div>
+      </div>
+
+      <div id="scenario-box">
+        <div>
+          <div class="scenario-label">Situation</div>
+          <div class="scenario-card">
+            <h4 id="scenario-title">—</h4>
+            <p id="scenario-desc">—</p>
+          </div>
+        </div>
+        <div>
+          <div class="scenario-label">Caller says</div>
+          <div class="caller-says" id="caller-says">—</div>
+        </div>
+      </div>
+
+      <div id="url-area">
+        <div class="url-label">📋 Paste process document URL</div>
+        <div class="url-input-row">
+          <input type="text" id="doc-url-input" placeholder="https://intranet.example.com/procedures/..." />
+          <button class="btn-submit" onclick="checkUrl()">SUBMIT</button>
+        </div>
+        <div id="url-feedback"></div>
+      </div>
+    </div>
+
+    <!-- RESULT -->
+    <div id="result-screen">
+      <div class="result-icon" id="result-icon">—</div>
+      <div id="result-score" style="color: var(--green)">—</div>
+      <div class="result-label" id="result-label">—</div>
+      <div class="result-detail" id="result-detail">—</div>
+      <button class="btn-next" onclick="startIncoming()">NEXT CALL →</button>
+    </div>
+
+  </div>
+
+  <!-- RIGHT: KNOWLEDGE BASE -->
+  <div id="kb-panel">
+    <div id="kb-header">
+      <h3>📂 Knowledge Base</h3>
+      <input type="text" id="kb-search" placeholder="Search documents..." oninput="filterKB(this.value)" />
+    </div>
+    <div id="kb-list"></div>
+  </div>
+
+</div>
+
+<!-- SCORE BAR -->
+<div id="score-bar">
+  <div class="score-item">CALLS <span class="val" id="s-total">0</span></div>
+  <div class="score-item">CORRECT <span class="val green" id="s-correct">0</span></div>
+  <div class="score-item">INCORRECT <span class="val red" id="s-wrong">0</span></div>
+  <div class="score-item">AVG TIME <span class="val" id="s-avg">—</span></div>
+</div>
+
+<script>
+// ── DATA ──────────────────────────────────────────────────────────────────
+
+const KB = [
+  {
+    category: "Transmission & Signal",
+    docs: [
+      { title: "STL Fault – Escalation & Recovery", url: "https://intranet.example.com/procedures/tx/stl-fault-escalation" },
+      { title: "FM Transmitter Dead Air Response", url: "https://intranet.example.com/procedures/tx/fm-dead-air-response" },
+      { title: "DAB+ Stream Quality Fault", url: "https://intranet.example.com/procedures/tx/dab-stream-quality" },
+      { title: "DVN Link Loss Procedure", url: "https://intranet.example.com/procedures/tx/dvn-link-loss" },
+      { title: "Transmitter Site Access – After Hours", url: "https://intranet.example.com/procedures/tx/site-access-after-hours" },
+    ]
+  },
+  {
+    category: "Automation & Playout",
+    docs: [
+      { title: "Zetta System Recovery – Primary Failure", url: "https://intranet.example.com/procedures/automation/zetta-primary-recovery" },
+      { title: "Zetta Backup Playout Activation", url: "https://intranet.example.com/procedures/automation/zetta-backup-activation" },
+      { title: "Automation Clock Drift & Sync Fix", url: "https://intranet.example.com/procedures/automation/clock-drift-fix" },
+      { title: "Log Import Failure – Emergency Override", url: "https://intranet.example.com/procedures/automation/log-import-failure" },
+    ]
+  },
+  {
+    category: "Remote Studios & ISDN",
+    docs: [
+      { title: "Remote Studio Connectivity Fault", url: "https://intranet.example.com/procedures/remote/studio-connectivity-fault" },
+      { title: "ISDN Fallback to POTS Procedure", url: "https://intranet.example.com/procedures/remote/isdn-pots-fallback" },
+      { title: "OB Van Signal Routing", url: "https://intranet.example.com/procedures/remote/ob-van-routing" },
+    ]
+  },
+  {
+    category: "Emergency & Compliance",
+    docs: [
+      { title: "Emergency Alert System (EAS) Activation", url: "https://intranet.example.com/procedures/emergency/eas-activation" },
+      { title: "Emergency Broadcast – Police / Fire Request", url: "https://intranet.example.com/procedures/emergency/police-fire-request" },
+      { title: "Off-Air Compliance – Unplanned Silence", url: "https://intranet.example.com/procedures/emergency/unplanned-silence-compliance" },
+      { title: "ACMA Fault Reporting Template", url: "https://intranet.example.com/procedures/emergency/acma-fault-report" },
+    ]
+  },
+  {
+    category: "Network & IP",
+    docs: [
+      { title: "Network Sync & Delay Troubleshooting", url: "https://intranet.example.com/procedures/network/sync-delay-troubleshoot" },
+      { title: "Satellite Uplink Fault Response", url: "https://intranet.example.com/procedures/network/satellite-uplink-fault" },
+      { title: "IP Audio Codec Reconnect Procedure", url: "https://intranet.example.com/procedures/network/ip-codec-reconnect" },
+      { title: "Syndication Feed Loss – Downstream Markets", url: "https://intranet.example.com/procedures/network/syndication-feed-loss" },
+    ]
+  },
+  {
+    category: "On-Air & Talent",
+    docs: [
+      { title: "Presenter No-Show – Emergency Protocol", url: "https://intranet.example.com/procedures/onair/presenter-no-show" },
+      { title: "On-Air Phone System Fault", url: "https://intranet.example.com/procedures/onair/phone-system-fault" },
+      { title: "Content Breach – On-Air Incident Report", url: "https://intranet.example.com/procedures/onair/content-breach-report" },
+    ]
+  },
+];
+
+const SCENARIOS = [
+  {
+    caller: "Mt Coot-tha Tx Site",
+    title: "FM Transmitter – STL Drop",
+    desc: "The transmitter at the primary FM site is reporting an STL signal loss. The site engineer says the microwave link went down 4 minutes ago. Output has not yet fallen to silence but could at any moment.",
+    callerSays: "Yeah look, the STL's dropped out. I'm up at the site. Transmitter's still running on the last feed it cached but I'd say we've got maybe 2–3 minutes before it goes silent. What's the escalation path here?",
+    correctUrl: "https://intranet.example.com/procedures/tx/stl-fault-escalation"
+  },
+  {
+    caller: "Master Control Room",
+    title: "Zetta Primary Server – System Crash",
+    desc: "The primary Zetta playout server has crashed unexpectedly. Output has auto-failed to the backup, which is currently running. The Program Director wants to know the recovery process for the primary and whether we can manually intervene on the live log.",
+    callerSays: "Primary Zetta is completely down. Backup's on air, no dead air — but we can't edit the log remotely and there's a live read in 8 minutes that won't fire automatically. What do we do?",
+    correctUrl: "https://intranet.example.com/procedures/automation/zetta-primary-recovery"
+  },
+  {
+    caller: "Network Syndication Ops",
+    title: "Signal Delay – Downstream Markets",
+    desc: "A syndicated network feed is running 15 seconds behind schedule across three downstream markets. The source origin appears correct. Engineers suspect a network buffering issue on the distribution path.",
+    callerSays: "Our feed to Brisbane, Adelaide and Perth is 15 seconds behind. Origin side looks fine. I think it's on the distribution path somewhere. What's the procedure for isolating the delay and notifying the affected markets?",
+    correctUrl: "https://intranet.example.com/procedures/network/sync-delay-troubleshoot"
+  },
+  {
+    caller: "QPS Communications",
+    title: "Emergency Alert Request – Police",
+    desc: "Queensland Police Service is requesting activation of the Emergency Alert System for a flood warning affecting the Ipswich LGA. The request has come through the correct QPS channel and duty manager approval is pending.",
+    callerSays: "This is Sergeant Donovan from QPS Communications. We need an EAS activation for a flood warning in Ipswich, effective immediately. Can you confirm the process and who I need to authorise this with?",
+    correctUrl: "https://intranet.example.com/procedures/emergency/eas-activation"
+  },
+  {
+    caller: "Toowoomba Remote Studio",
+    title: "ISDN Loss – Remote Studio",
+    desc: "The Toowoomba remote studio has lost its ISDN connection mid-broadcast. The presenter is currently on air but audio is intermittently dropping. Engineers need to initiate the ISDN-to-POTS fallback.",
+    callerSays: "We've lost ISDN up here. Presenter's still going but you'd be hearing the drops. We need to go to the fallback line — what are the steps to switch over without dropping the broadcast?",
+    correctUrl: "https://intranet.example.com/procedures/remote/isdn-pots-fallback"
+  },
+  {
+    caller: "Listener Relations",
+    title: "DAB+ Stream – Audio Quality Complaints",
+    desc: "Multiple listener complaints have been logged about distorted or degraded audio quality on the DAB+ digital stream. The FM signal appears unaffected. Engineers need to begin the DAB+ stream fault procedure.",
+    callerSays: "I've had four calls in the last ten minutes about the DAB+ signal. People are saying it sounds awful, robotic. FM sounds fine apparently. Is there a specific procedure for that stream or do I just log it?",
+    correctUrl: "https://intranet.example.com/procedures/tx/dab-stream-quality"
+  },
+  {
+    caller: "National Content Hub",
+    title: "Syndication Feed – Total Loss",
+    desc: "The national syndication feed from the content hub has dropped entirely. Three regional markets are currently playing automation content as a fallback. The outage began approximately 7 minutes ago.",
+    callerSays: "We've lost the national feed completely. Bundaberg, Cairns and Mackay have fallen to their local automation. No ETA on restore yet. I need the downstream markets procedure so we can notify the right people.",
+    correctUrl: "https://intranet.example.com/procedures/network/syndication-feed-loss"
+  },
+  {
+    caller: "Studio A – On-Air",
+    title: "Presenter No-Show",
+    desc: "The breakfast presenter has not arrived for their 5:30am shift. It is currently 5:22am. No replacement has been arranged. The automation system can carry the show but live reads, competitions and a sponsor promo are all scheduled.",
+    callerSays: "It's 5:22 and no sign of [presenter]. Phone goes to voicemail. We've got automation ready but the show has live commitments. Is there an emergency protocol for this?",
+    correctUrl: "https://intranet.example.com/procedures/onair/presenter-no-show"
+  },
+  {
+    caller: "ACMA Duty Officer",
+    title: "Unplanned Silence – Compliance Notice",
+    desc: "ACMA has contacted the station following a logged unplanned silence event of 3 minutes 42 seconds on the primary frequency at 02:14 AEST. A formal fault report must be submitted within 24 hours per licence conditions.",
+    callerSays: "Good morning. ACMA Duty Officer. We logged an unplanned silence on your primary frequency this morning, approximately 3 minutes 40 seconds. You'll need to submit a fault report under your licence conditions. Can you confirm your process for that?",
+    correctUrl: "https://intranet.example.com/procedures/emergency/acma-fault-report"
+  },
+  {
+    caller: "OB Van – Event Coverage",
+    title: "OB Van Signal – Routing Failure",
+    desc: "The OB van deployed to the Brisbane Show is unable to get a clean signal back to the studio. The van's IP codec is connected but the routing at the MCR end is not receiving audio. The segment is on air in 6 minutes.",
+    callerSays: "We're at the showground. Codec is up and showing connected on our end but MCR says they can't hear us. We're 6 minutes out. What's the routing check procedure from the MCR side?",
+    correctUrl: "https://intranet.example.com/procedures/remote/ob-van-routing"
+  },
+];
+
+// ── STATE ─────────────────────────────────────────────────────────────────
+
+let currentScenario = null;
+let timerInterval = null;
+let elapsedSeconds = 0;
+let attempts = 0;
+let stats = { total: 0, correct: 0, wrong: 0, times: [] };
+let usedScenarios = [];
+
+// ── TIMER ─────────────────────────────────────────────────────────────────
+
+function startTimer() {
+  elapsedSeconds = 0;
+  clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    elapsedSeconds++;
+    const m = String(Math.floor(elapsedSeconds / 60)).padStart(2, '0');
+    const s = String(elapsedSeconds % 60).padStart(2, '0');
+    document.getElementById('header-timer').textContent = `${m}:${s}`;
+  }, 1000);
+}
+
+function stopTimer() {
+  clearInterval(timerInterval);
+}
+
+function formatTime(secs) {
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+}
+
+// ── KB RENDER ────────────────────────────────────────────────────────────
+
+function renderKB(filter = '') {
+  const list = document.getElementById('kb-list');
+  list.innerHTML = '';
+  const q = filter.toLowerCase();
+
+  KB.forEach(cat => {
+    const filtered = cat.docs.filter(d =>
+      d.title.toLowerCase().includes(q) || d.url.toLowerCase().includes(q)
+    );
+    if (!filtered.length) return;
+
+    const catEl = document.createElement('div');
+    catEl.className = 'kb-category';
+    catEl.textContent = cat.category;
+    list.appendChild(catEl);
+
+    filtered.forEach(doc => {
+      const item = document.createElement('div');
+      item.className = 'kb-item';
+      item.dataset.url = doc.url;
+      item.innerHTML = `
+        <div class="doc-title">${doc.title}</div>
+        <div class="doc-url">
+          <span>${doc.url}</span>
+          <span class="copy-hint">[ click to copy ]</span>
+        </div>
+      `;
+      item.addEventListener('click', () => {
+        navigator.clipboard.writeText(doc.url).catch(() => {});
+        document.getElementById('doc-url-input').value = doc.url;
+        // brief flash
+        item.style.background = 'rgba(245,166,35,0.15)';
+        setTimeout(() => item.style.background = '', 300);
+      });
+      list.appendChild(item);
+    });
+  });
+}
+
+function filterKB(val) { renderKB(val); }
+
+// ── FLOW ──────────────────────────────────────────────────────────────────
+
+function pickScenario() {
+  const remaining = SCENARIOS.filter((_, i) => !usedScenarios.includes(i));
+  if (!remaining.length) { usedScenarios = []; return pickScenario(); }
+  const idx = Math.floor(Math.random() * remaining.length);
+  const globalIdx = SCENARIOS.indexOf(remaining[idx]);
+  usedScenarios.push(globalIdx);
+  return remaining[idx];
+}
+
+function show(id) {
+  ['idle-screen','incoming-screen','active-screen','result-screen'].forEach(s => {
+    document.getElementById(s).style.display = 'none';
+  });
+  document.getElementById(id).style.display = 'flex';
+}
+
+function startIncoming() {
+  attempts = 0;
+  currentScenario = pickScenario();
+  document.getElementById('caller-id').textContent = currentScenario.caller;
+  document.getElementById('status-pill').className = 'pill standby';
+  document.getElementById('status-pill').textContent = 'INCOMING';
+  show('incoming-screen');
+}
+
+function answerCall() {
+  if (!currentScenario) return;
+
+  document.getElementById('active-caller-name').textContent = currentScenario.caller;
+  document.getElementById('scenario-title').textContent = currentScenario.title;
+  document.getElementById('scenario-desc').textContent = currentScenario.desc;
+  document.getElementById('caller-says').textContent = currentScenario.callerSays;
+
+  const input = document.getElementById('doc-url-input');
+  input.value = '';
+  input.className = '';
+  document.getElementById('url-feedback').textContent = '';
+  document.getElementById('url-feedback').className = '';
+
+  document.getElementById('status-pill').className = 'pill live';
+  document.getElementById('status-pill').textContent = 'ON CALL';
+
+  show('active-screen');
+  startTimer();
+}
+
+function checkUrl() {
+  const input = document.getElementById('doc-url-input');
+  const val = input.value.trim();
+  const feedback = document.getElementById('url-feedback');
+
+  if (!val) {
+    feedback.textContent = '⚠ Paste a URL first.';
+    feedback.className = 'bad';
+    return;
+  }
+
+  attempts++;
+
+  if (val === currentScenario.correctUrl) {
+    // CORRECT
+    stopTimer();
+    input.className = 'correct';
+    feedback.textContent = `✓ Correct! Submitting result...`;
+    feedback.className = 'ok';
+
+    stats.total++;
+    stats.correct++;
+    stats.times.push(elapsedSeconds);
+    updateScoreBar();
+
+    setTimeout(() => showResult(true), 800);
+  } else {
+    // WRONG
+    input.className = 'incorrect';
+    if (attempts >= 3) {
+      feedback.textContent = `✗ Incorrect. Answer: ${currentScenario.correctUrl}`;
+      feedback.className = 'bad';
+      stopTimer();
+      stats.total++;
+      stats.wrong++;
+      stats.times.push(elapsedSeconds);
+      updateScoreBar();
+      setTimeout(() => showResult(false), 1200);
+    } else {
+      feedback.textContent = `✗ Not right — try again. (Attempt ${attempts}/3)`;
+      feedback.className = 'bad';
+      input.className = '';
+      setTimeout(() => { input.className = ''; }, 600);
+    }
+  }
+}
+
+function showResult(passed) {
+  document.getElementById('status-pill').className = passed ? 'pill done' : 'pill standby';
+  document.getElementById('status-pill').textContent = passed ? 'RESOLVED' : 'MISSED';
+
+  const icon = document.getElementById('result-icon');
+  const score = document.getElementById('result-score');
+  const label = document.getElementById('result-label');
+  const detail = document.getElementById('result-detail');
+
+  if (passed) {
+    icon.textContent = '✅';
+    score.textContent = formatTime(elapsedSeconds);
+    score.style.color = elapsedSeconds < 30 ? 'var(--green)' : elapsedSeconds < 60 ? 'var(--amber)' : 'var(--red)';
+    label.textContent = 'Time to resolution';
+    detail.innerHTML = `<strong>${currentScenario.title}</strong><br><br>Correct document identified${attempts > 1 ? ` after ${attempts} attempts` : ' on first attempt'}.<br><br><span style="font-family:var(--mono);font-size:11px;color:var(--text-dim)">${currentScenario.correctUrl}</span>`;
+  } else {
+    icon.textContent = '❌';
+    score.textContent = 'FAIL';
+    score.style.color = 'var(--red)';
+    label.textContent = `Not resolved in 3 attempts`;
+    detail.innerHTML = `<strong>${currentScenario.title}</strong><br><br>Correct document was:<br><br><span style="font-family:var(--mono);font-size:11px;color:var(--amber)">${currentScenario.correctUrl}</span>`;
+  }
+
+  show('result-screen');
+}
+
+function updateScoreBar() {
+  document.getElementById('s-total').textContent = stats.total;
+  document.getElementById('s-correct').textContent = stats.correct;
+  document.getElementById('s-wrong').textContent = stats.wrong;
+  if (stats.times.length) {
+    const avg = Math.round(stats.times.reduce((a,b)=>a+b,0) / stats.times.length);
+    document.getElementById('s-avg').textContent = formatTime(avg);
+  }
+}
+
+// allow enter key in url input
+document.getElementById('doc-url-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') checkUrl();
+});
+
+// ── INIT ─────────────────────────────────────────────────────────────────
+renderKB();
+show('idle-screen');
+</script>
+</body>
+</html>
